@@ -1,0 +1,1588 @@
+---
+title: "Fall 2021 - Final Examination"
+author: "Trishla Jain"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+# Instructions
+
+_Your goal for this final exam is to conduct the necessary analyses of vaccination rates in California schools and school districts and then write up a technical report for a scientifically knowledgeable staff member in a California state legislator’s office. You should provide sufficient numeric and graphical detail that the staff member can create a comprehensive briefing for a legislator (see question 7 for specific points of interest). You can assume that the staff member understands the concept of statistical significance and other basic concepts like mean, standard deviation, and correlation, so you do not need to define those. _ 
+
+_For this exam, the report writing is very important: Your responses will be graded on the basis of clarity; conciseness; inclusion and explanation of specific and appropriate statistical values; inclusion of both frequentist and Bayesian inferential evidence (i.e., it is not sufficient to just examine the data and say what you see); explanation of any included tabular material and the appropriate use of graphical displays when/if necessary. It is also important to conduct a thorough analysis, including both data exploration and cleaning and appropriate diagnostics. Bonus points will be awarded for work that goes above expectations._
+
+_In your answer for each question, make sure you write a narrative with complete sentences that answers the substantive question. Please place the answers in the text (not R comments) after the relevant analysis. You can choose to put important statistical values into a table for readability, or you can include the statistics within your narrative. Be sure that you not only report what a test result was, but also what that result means substantively for the question you are answering. Please keep your answers concise and focused on the question asked. Make sure to include enough statistical information so that another analytics professional could review your work. Your report can include graphics created by R, keeping in mind that if you do include a graphic, you will have to provide some accompanying narrative text to explain what it is doing in your report. Finally, be sure to proofread your final knitted submission to ensure that everything is included and readable (e.g., that the code does not run off the edge of the page)._
+
+_You *may not* receive assistance, help, coaching, guidance, or support from any human except your instructor at any point during this exam. Obtaining improper assistance will result in a 0 for this exam. Your instructor will be available by email throughout the report writing period if you have questions, but don’t wait until the last minute!_ 
+
+## Data
+
+_You have a personalized RData file available on Blackboard area that contains two data sets that pertain to vaccinations for the U.S. as a whole and for Californian school districts. The U.S. vaccine data is a time series and the California data is a sample of end-of-year vaccination reports from n=700 school districts. Here is a description of the datasets:_
+
+usVaccines – Time series data from the World Health Organization reporting vaccination rates in the U.S. for five common vaccines
+
+```{ eval=FALSE}
+Time-Series [1:38, 1:5] from 1980 to 2017: 
+ - attr(*, "dimnames")=List of 2
+  ..$ : NULL
+  ..$ : chr [1:5] "DTP1" "HepB_BD" "Pol3" "Hib3" “MCV1”... 
+```
+
+_(Note: DTP1 = First dose of Diphtheria/Pertussis/Tetanus vaccine (i.e., DTP); HepB_BD = Hepatitis B, Birth Dose (HepB); Pol3 = Polio third dose (Polio); Hib3 – Influenza third dose; MCV1 = Measles first dose (included in MMR))_ 
+
+districts – A sample of California public school districts from the 2017 data collection, along with specific numbers and percentages for each district: 
+
+```{ eval=FALSE}
+'data.frame':	700 obs. of  14 variables:
+ $ DistrictName    : Name of the district
+ $ WithDTP         : Percentage of students in the district with the DTP vaccine
+ $ WithPolio       : Percentage of students in the district with the Polio vaccine
+ $ WithMMR         : Percentage of students in the district with the MMR vaccine
+ $ WithHepB        : Percentage of students in the district with Hepatitis B vaccine
+ $ PctUpToDate     : Percentage of students with completely up-to-date vaccines
+ $ DistrictComplete: Boolean showing whether or not district’s reporting was complete
+ $ PctBeliefExempt : Percentage of all enrolled students with belief exceptions
+ $ PctMedicalExempt: Percentage of all enrolled students with medical exceptions
+ $ PctChildPoverty : Percentage of children in district living below the poverty line
+ $ PctFamilyPoverty: Percentage of families in district living below the poverty line
+ $ PctFreeMeal     : Percentage of students in the district receiving free or reduced cost meals
+ $ Enrolled        : Total number of enrolled students in the district
+ $ TotalSchools    : Total number of different schools in the district
+```
+
+_As might be expected, the data are quite skewed: districts range from 1 to 582 schools enrolling from 10 to more than 50,000 students (NB. your sample may be slightly different). Further, while most districts have low rates of missing vaccinations, a handful are quite high. Be sure to note problems the data cause for the analysis and address any problems you can. Note that the data are about districts, not individual students, so be careful that you do not commit an ecological fallacy by stating conclusions about individuals. _
+
+_In addition, you will find on Blackboard a CSV file, All Schools.csv, with data about 7,381 individual schools._
+
+```{r eval=FALSE}
+'data.frame' 7,381 obs. of 18 variables:
+ $ SCHOOL CODE              : School ID number 
+ $ PUBLIC/ PRIVATE          : School status, "PUBLIC" or "PRIVATE" (note the space in the variable name: you can access it as `PUBLIC/ PRIVATE`)
+ $ Public School District ID: School district ID (only if public)
+ $ PUBLIC SCHOOL DISTRICT   : School district name (only if public)
+ $ CITY                     : City name
+ $ COUNTY                   : Country name
+ $ SCHOOL NAME              : School name
+ $ ENROLLMENT               : Total number of enrolled students in the school
+ $ UP_TO_DATE               : Number of students with completely up-to-date vaccines
+ $ CONDITIONAL              : Number of students missing some vaccine without an exemption
+ $ PME                      : Number of students with a medical exemption
+ $ PBE_BETA                 : Number of students with a personal belief exemption
+ $ DTP                      : Number of students in the district with the DTP vaccine
+ $ POLIO                    : Number of students in the district with the Polio vaccine
+ $ MMR                      : Number of students in the district with the MMR vaccine
+ $ HEPB                     : Number of students in the district with Hepatitis B vaccine
+ $ VARICELLA                : Number of students in the district with Varicella vaccine
+ $ REPORTED                 : Whether the school reported vaccination data (Y or N)
+```
+
+
+## Please Note:
+
+1. Data exploration and cleaning has been done at the start of the file (seperately for all 3 data sets provided) to better understand the data and the cleaned data set has been used directly in the questions. 
+2. There are places where non significant variables haven't been reported to avoid readers fatigue.
+3. There are places where base R plots have been used to check linearity and Dharma and check_model plots haven't been used intentionally to avoid repeating and analyzing the same thing again and again.
+4. Apologies for any typos (if any!) I tried my best to remove!
+  
+# Answers:::
+
+Before we begin to answer the questions lets explore the data and do any pre processing or cleaning that is needed so that we can answer the questions with better insights.
+
+
+## Loading the libraries 
+
+```{r}
+#options(warn=-1)
+suppressMessages(library(tidyverse))
+suppressMessages(library(dplyr))
+suppressMessages(library(ggplot2))
+suppressMessages(library(DHARMa))
+suppressMessages(library(dlookr))
+suppressMessages(library(e1071))
+suppressMessages(library(moments))
+suppressMessages(library(GGally))
+suppressMessages(library(psych))
+suppressMessages(library(pairsD3))
+suppressMessages(library(corrplot))
+suppressMessages(library(TSA))
+suppressMessages(library(tseries))
+suppressMessages(library(changepoint))
+suppressMessages(library(BEST))
+suppressMessages(library(car))
+suppressMessages(library(BayesFactor))
+suppressMessages(library(lm.beta))
+suppressMessages(library(HSAUR))
+suppressMessages(library(see))
+suppressMessages(library(performance))
+suppressMessages(library(MCMCpack))
+
+
+```
+
+__Loading the necessary files__
+
+```{r}
+load("C:/Users/trish/Desktop/syracuse/Sem 1/IST.772.M001.FALL21.Quant Reasoning Data Science 17460.1221/final exam/datasets9.RData")
+schools <- read.csv("C:/Users/trish/Desktop/syracuse/Sem 1/IST.772.M001.FALL21.Quant Reasoning Data Science 17460.1221/final exam/All Schools.csv")
+#schools <- read_csv("All Schools.csv")
+```
+
+## Data Exploration Data Preprocessing and Cleaning For districts data set
+
+
+1. Checking for NA's in the datasets
+
+```{r}
+summary(districts)
+sum(is.na(districts))
+districts %>% plot_na_pareto( col = "blue") 
+
+```
+We can see that there are 244 NA's in PctFreeMeal column in the districts dataset. Looking at the parento plot, we can see that it would be a good idea to remove these but since removing rows will lead to loss of data with only 456 out of 700 records we will instead remove this column from analysis .
+
+```{r}
+districts_noNA <- subset(districts, select = -c(PctFreeMeal) )
+#districts %>% drop_na() -> districts_noNA
+
+# checking if Na's are out of the dataset
+sum(is.na(districts_noNA))
+```
+Now we have no Na's in districts 
+
+2. Checking for Null's in the datasets
+
+```{r}
+sapply(districts_noNA,function(x) sum(is.null(x)))
+```
+We have no NULL records in the dataset.
+
+3. Checking for outliers
+
+```{r}
+diagnose_outlier(districts_noNA)
+```
+```{r}
+plot_outlier(districts)
+```
+
+We can see that maximum ouliers lie in column Enrolled and TotalSchools and rest lie around 45-50 (taking 50 as the average outliers as the diagnose shows us mostly all columns have around 45-50 outliers, we can see that around 7% of the data is comprising of outliers). Looking at the graphs for these columns, we can see that despite removing outliers, the data is still skewed and only the scale changes or reduces in scale thereby making the bars thicker. Since we don't get a normal distribution post removal of outliers, we can keep the data for now and see if the removal is needed later. Eg: the outlier diagnosis plot of total schools with outliers is with a  scale of 0 to 600 and without outliers is 0 to 20, but despite removing the outlier we can see that it is still right skewed.
+
+4. Checking skewness
+
+```{r}
+#skewness(districts_noNA %>% select(-DistrictName))
+#with(Data_noType, apply(cbind(education, income, women, prestige,census), 2, skewness))
+with(districts_noNA, apply(cbind(WithDTP,WithPolio,WithMMR, WithHepB,
+                                 PctUpToDate, DistrictComplete,PctBeliefExempt
+                                 ,PctMedicalExempt, PctChildPoverty,
+                                 PctFamilyPoverty, Enrolled,
+                                 TotalSchools), 2, skewness))
+```
+We can see high skewness for Enrolled and TotalSchools. 
+
+Checking which transformation can help reduce this skweness
+
+```{r}
+plot_normality(districts_noNA)
+```
+
+To remove this skewness lets create a new dataframe with the columns with log transformation instead and then lets check the skewness. We won't be taking log transformation on the other variables becuase there isn't alot of skewness and we don't want to mess up with the percent values and make it harder to interpret.
+
+```{r}
+# taking out type variable so that we can take correlation in the next step
+districts_log <- districts_noNA
+# taking log transformation on the income column in the newly created dataset
+districts_log$Enrolled <- log(districts_log$Enrolled)
+districts_log$TotalSchools <- log(districts_log$TotalSchools)
+with(districts_log, apply(cbind(WithDTP,WithPolio,WithMMR, WithHepB,
+                                 PctUpToDate, DistrictComplete,PctBeliefExempt
+                                 ,PctMedicalExempt, PctChildPoverty,
+                                 PctFamilyPoverty, Enrolled,
+                                 TotalSchools), 2, skewness))
+
+#skewness(subset(districts_log, select = -c(DistrictName) ))
+```
+As we can see the skewness reduced alot for the Enrolled and TotalSchools columns.
+
+Let's check if the outliers were taken care of as well due to this for these two columns
+```{r}
+diagnose_outlier(districts_log)
+plot_outlier(subset(districts_log, select = c(Enrolled, TotalSchools) ))
+```
+As we can see the outliers from 63 for Enrolled and 55 for TotalSchools has reduced to 1 which is great. Looking at the outlier plots for these two columns we see we are way close to normal distribution now due to log transformation and have removed the right skewness that existed in the original dataset.
+
+5. Checking if the data is normal or not
+
+```{r}
+normality(districts_log)
+```
+
+The data looks good.
+
+6. Checking correlation
+
+```{r}
+#cor(districts_log %>% select(-c(DistrictName)))
+#plot_correlate(districts_log %>% select(-c(DistrictName)))
+corrplot(cor(districts_log %>% dplyr::select(-c(DistrictName))),
+   method = "color", 
+   addCoef.col="grey", 
+   order = "AOE", 
+   number.cex=0.75)
+```
+We can see that DistrictComplete, PctMedicalExempt, PctFamilyPoverty , Enrolled, TotalSchools are not highly correlated, rest of the columns which are WithMMR, WithHepB, PctUpToDate have high positive correlation which makes sense as the parents getting their children vaccination for one kind of disease isn't an anti vaxer so will end up getting their children all the vaccines and keep the vaccines up to date and PctBeliefExempt has high negative correlation which makes sense as people with medical exemption won't be taking a vaccine or having thier vaccinations up to date.
+
+## Data Exploration Data Preprocessing and Cleaning For schools data set
+
+1. Checking for NA's in the datasets
+
+
+```{r}
+summary(schools)
+sum(is.na(schools))
+schools %>% plot_na_pareto( col = "blue")
+```
+
+In the school dataset, there are a total of 3990 NA's and looking at the summary we can see that there are 10 columns each having 399 NA's (hence the number 3990) and the columns are ENROLLMENT, UP_TO_DATE, CONDITIONAL, PME, PBE_BETA, DTP, POLIO,MMR, HEPB and VARICELLA.
+Looking at the parento plot it seems like these aren't that much of an issue.
+
+Let's check if we can find any pattern we can to which null's occur and if there are full rows of NA's as we can't just remove 3990 records and reduce the data set by half in the process and looking at the data manually we can see most of the records have reported as N. Checking if this pattern is true and checking how many such records exists with the full row N
+
+```{r}
+View(schools[which(schools$REPORTED == 'N'), ] )
+#schools %>% drop_na() -> schools_noNA
+
+# checking how many such records are there 
+sum(schools$REPORTED == 'N')
+```
+
+Removing these 400 records but since there are 399 NA's there is one good record in this 400 and we wont be dropping that.
+
+```{r}
+schools %>% drop_na() -> schools_noNA
+```
+
+Rechecking our NA's
+
+```{r}
+sum(is.na(schools_noNA))
+```
+
+
+2.Checking for Null's in the datasets
+
+```{r}
+sapply(schools,function(x) sum(is.null(x)))
+```
+We have no NULL records in the dataset.
+
+3. Checking for outliers
+
+```{r}
+diagnose_outlier(schools) 
+```
+It seems like there are a lot of outliers in school code, conditional, pme and pbe_beta.
+
+Plotting and checking if removing these outliers is a good idea or not
+
+```{r}
+plot_outlier(schools_noNA)
+```
+
+We can see that removing the outliers in school code column makes the graph bimodal rather than left skewed, almost normal for enrollment, varicella, HEPB, MMR, Polio, DPT, Up_TO_DATE, conditional remains right skewed, PME becomes uniform,  PBE_BETA remains skewed to the right.
+
+4. Checking skewness
+
+```{r}
+skewness(select_if(schools_noNA, is.numeric))
+```
+
+PME and PBE_BETA seem to have high correlation and there is some skewness in school code and conditional.
+On further inspection, we can see that school code is School ID number which doesn't seem important so we wont be trying to reduce skewness for this.
+
+Checking which transformation can lead to normal data 
+```{r}
+plot_normality(schools_noNA)
+```
+
+
+We will address this skewness using sqrt transformation rather than log transformation as that can induce NaN in the dataset.
+
+
+```{r}
+# taking out type variable so that we can take correlation in the next step
+schools_sqrt <- schools_noNA
+# taking sqrt transformation on the income column in the newly created dataset
+schools_sqrt$PME <- sqrt(schools_sqrt$PME)
+schools_sqrt$PBE_BETA <- sqrt(schools_sqrt$PBE_BETA)
+schools_sqrt$CONDITIONAL <- sqrt(schools_sqrt$CONDITIONAL)
+skewness(select_if(schools_noNA, is.numeric))
+skewness(select_if(schools_sqrt, is.numeric))
+```
+As we can see above, the skewness has reduced. Now checking if the outliers have reduced as well:
+
+```{r}
+diagnose_outlier(schools_sqrt)
+```
+
+We can see that the outlier counts for Conditional, PBE_BETA have reduced but PME remained the same.
+
+5. Checking the normality 
+
+```{r}
+normality(schools_sqrt)
+```
+
+PME like the other columns seems to have normal data as the p - value is less than the threshold of 0.05, hence we won't do any clean up for the outliers.
+
+6. Checking the correlation:
+
+```{r}
+cor(select_if(schools_sqrt, is.numeric))
+corrplot(cor(select_if(schools_sqrt, is.numeric)),
+         method = "color",
+         addCoef.col="grey",
+         order = "AOE",
+         number.cex=0.75)
+
+```
+
+We can see that Enrollment, DTP, varicella, polio, hepb, mmr, up_to_date are
+highly correlated, rest of the columns dont have a good correlation which makes sense as the parents getting their children vaccination for one kind of disease isn’t
+an anti vaxer so will end up getting their children all the vaccines and keep the vaccines up to date and it is good to see that enrolled students are vaccinated, which could mean that the schools might be mandating vaccines as a pre requisite in the school.
+
+## Data Exploration Data Preprocessing and Cleaning For usVaccines time series data
+
+1. Checking basics structure of the time series data
+```{r}
+summary(usVaccines)
+str(usVaccines)
+```
+
+2. Checking for skewness
+
+```{r}
+skewness(usVaccines)
+```
+
+There is barely any skewness in the dataset
+
+3. Checking for outliers:
+```{r}
+diagnose_outlier(as.data.frame(usVaccines))
+
+```
+```{r}
+plot_outlier(as.data.frame(usVaccines))
+```
+We can see that there are outliers but removing them won't make much of a difference in our descrptive statistics so we wont be making any changes and move ahead.
+
+3. Checking for NA's
+
+```{r}
+colSums(is.na(data.frame(usVaccines)))
+```
+There are no NA's.
+
+4. Checking the time series plot
+
+```{r}
+plot(usVaccines)
+```
+We can see that DTP1 was increasing steadily from 1980 but saw a sudden drop at around 1990 and then saw a good growth trend till 2010. Same is the case with HiB3. For HepB_BD we can see that it was constant from 1980 to around 2001 and then it just a good jump in the next decade.
+MCV1 saw high variability in vaccination rates from 1980 to start of 1990 with it's lowest at around 1988. Then it showed a pretty stead group rate till 2010 with no sudden spikes.
+Pol3 saw a high vaccination rate from 1980 to around 1987 then saw a sudden drop around 1987 and then peaked saw another drop at around the beginning of 1990 and then increased and got steady by the end of the time series.
+Basically all of them seemed to have dropped at around 1987.
+
+5. Checking the correlation
+
+```{r}
+corrplot(cor(usVaccines), method = "color", addCoef.col="grey",
+         order = "AOE",number.cex=0.75)
+
+```
+We can see that MCV1 and P0l3 are having the highest correlation in the series with the value of 0.73 then pol3 and hib3 then hepb_bd and dtp and then hib3 and dtp. We must remove these trend before proceeding 
+with any substantive analysis
+
+6. Doing differencing to remove trends before analysis
+```{r}
+usVaccinesDiff <- diff(usVaccines)
+plot(usVaccinesDiff)
+```
+
+7. Examining the auto-correlation function (ACF) graph for the time series
+
+```{r}
+acf(usVaccines)
+acf(usVaccinesDiff)
+```
+We can see that 16 auto correlations are significant in the original data set and post differencing we can see that around 7 are significant.
+Since a stationary variable typically contains no significant or very few lagged correlations the data seems almost stationary and we also don't see pattern of positive and negative autocorrelations hence no sinusoidal pattern is still present at a low level in these data. 
+
+Now lets answer the questions finally!!
+
+# Descriptive Reporting
+
+## 1.	_Basic Introductory Paragraph_
+
+_In your own words, write about three sentences of introduction addressing the staff member in the state legislator’s office. Frame the problem/topic that your report addresses._
+
+We will be analyzing vaccination rates in California schools and school districts
+using various statistical tools using Time series data from the World Health Organization reporting vaccination rates in the U.S. for five common vaccines and California public school districts from 2017 data collection along with data from about 7,381 individual schools. Given the world's recent exposure to COVID-19, we know now more than ever how vaccinations can curb the spread of virus and saves lives, and in this report we will analyze and see how different factors like poverty, religion, medical factors affect vaccinations and analyze the vaccination rates.
+
+## 2.	_Descriptive Overview of U.S. Vaccinations_
+
+_You have U.S. vaccination data going back 38 years, but the staff member is only interested in recent vaccination rates as a basis of comparison with California schools._ 
+
+```{r}
+usVaccines_latestData <- window(usVaccines, start = 2007, end = 2017)
+```
+
+### a.	_How have U.S. vaccination rates varied over time? _
+
+```{r}
+plot(usVaccines)
+```
+We can see that DTP1 was increasing steadily from 1980 but saw a sudden drop at around 1990 and then saw a good growth trend till 2010. Same is the case with HiB3. For HepB_BD we can see that it was constant from 1980 to around 2001 and then it just a good jump in the next decade.
+MCV1 saw high variability in vaccination rates from 1980 to start of 1990 with it's lowest at around 1988. Then it showed a pretty stead group rate till 2010 with no sudden spikes.
+Pol3 saw a high vaccination rate from 1980 to around 1987 then saw a sudden drop around 1987 and then peaked saw another drop at around the beginning of 1990 and then increased and got steady by the end of the time series.
+Basically all of them seemed to have dropped at around 1987.
+
+Checking the same now only for latest data:
+
+```{r}
+plot(usVaccines_latestData)
+```
+For DTP1 we can see that there is some variability where it increases at around 2008 the drops at around 2009 , remains constant till around 2011 then drops again at 2012 and post its increase in  2013 it remains constant till 2017.
+For Hib3 we can see that it also decreases in around 2009, then increases at around 2011 and then remains constant.
+For HEPB_BD, we see an increasing trend till 2013 and then it staggers alot till end of 2015 and becomes constant post that.
+For MCV1, there is variability till 2012 with highs and lows and then it increases in mid 2013 and remains constant till 2017.
+Pol3 has the most variability as its going up and down again and again and see's low rates of vaccination in between 2012 to 2015 and then increases and becomes almost constant till 2017.
+
+
+
+### b.	_Are there notable trends or cyclical variation in U.S. vaccination rates?_
+
+Assumption: Since the staff members are only interested in recent vaccination rates we will use that dataset instead of the original data set.
+```{r}
+acf(usVaccines_latestData[,"DTP1"])
+acf(usVaccines_latestData[,"HepB_BD"])
+acf(usVaccines_latestData[,"Pol3"])
+acf(usVaccines_latestData[,"Hib3"])
+acf(usVaccines_latestData[,"MCV1"])
+acf(usVaccines_latestData)
+acf(diff(usVaccines_latestData))
+```
+For DTP1 we see no significant auto correlations and no cyclic variation as well, for HepB_BD again we don't see any auto correlations that are significant (not counting the perfect autocorrelation at lag = 0), same is the case for Pol3, Hib3 and MCV1 where there are no significant auto correlations and there is no strong cyclic pattern.
+Checking the lags of the whole data set we see 3 out of 6 auto correlations being significant but when we do differencing on the data set we see there are no significant auto correlations which is a good thing.
+We can further check this with the adf test
+
+```{r}
+adf.test(usVaccines_latestData[,"DTP1"])
+adf.test(diff(usVaccines_latestData[,"DTP1"]))
+adf.test(usVaccines_latestData[,"HepB_BD"])
+adf.test(diff(usVaccines_latestData[,"HepB_BD"]))
+adf.test(usVaccines_latestData[,"Pol3"])
+adf.test(diff(usVaccines_latestData[,"Pol3"]))
+adf.test(usVaccines_latestData[,"Hib3"])
+adf.test(diff(usVaccines_latestData[,"Hib3"]))
+adf.test(usVaccines_latestData[,"MCV1"])
+adf.test(diff(usVaccines_latestData[,"MCV1"]))
+```
+We can see that for HepB_BD the test fails to reject the null hypothesis that the data is non stationary as the p value is above the alpha level threshold of 0.05. For the other variables, the values are significant hence the data is stationary.  Hence we have mostly removed trend and cyclicity in the data.
+
+
+
+### c.	_What are the mean U.S. vaccination rates when including only recent years in the calculation of the mean (examine your answers to the previous question to decide what a reasonable recent period is, i.e., a period during which the rates are relatively constant)?_
+  
+```{r}
+#selecting only the years that start showing constant trend
+usVaccines_latestData_const <- window(usVaccines_latestData,start=2010, 
+                                      end=2017)
+usVaccines_latestData_const
+
+#checking the mean
+summary(usVaccines_latestData_const)
+```
+
+```{r}
+# checking the mean as a whole
+mean(usVaccines_latestData_const)
+```
+
+We can see that the mean for DTP1 is 97.88, HEPB_BD is 68.88, Pol3 is 93.5, Hib3 is 92.5 and MCV1 is 91.62. The overall vaccination mean is 88.9. Hence, Hepatitis B Birth Dose is the lowest.
+
+## 3.	_Descriptive Overview of California Vaccinations_
+
+_Your districts dataset contains four variables that capture the individual vaccination rates by district: WithDTP, WithPolio, WithMMR, and WithHepB._
+
+### a.	_What are the mean levels of these variables across districts?_ 
+
+```{r}
+#checking the mean based on districts
+
+#aggregate((districts_log %>%  select(WithDTP, WithPolio, WithMMR,
+#                                               WithHepB)), 
+#          list(districts_log$DistrictName)
+#          , FUN=mean)
+
+```
+
+```{r}
+summary(districts_log %>%  dplyr::select(WithDTP, WithPolio, WithMMR,
+                                               WithHepB))
+```
+We can see that the overall mean is 89.8 for WithDTP, 90.2 for WithPolio, 89.79 for WithMMR and 92.26 for WithHepB.
+
+### b.	_Among districts, how are the vaccination rates for individual vaccines related? In other words, if there are students with one vaccine, are students likely to have all of the others?_
+
+```{r}
+corrplot(cor(districts_log %>%  dplyr::select(WithDTP, WithPolio, WithMMR,
+                                               WithHepB, PctUpToDate)),
+         method = "color",addCoef.col="grey",order = "AOE",
+         number.cex=0.75)
+```
+  
+Looking at the correlation matrix above, it is visible that children who take one vaccine are very highly likely to take the other vaccines as well and when we check this with how how up to date students are with their vaccines we can see high correlation there as well.
+
+### c.	_How do these Californian vaccination levels compare to U.S. vaccination levels (recent years only)? Note any patterns you notice and run any appropriate statistical tests. _ 
+
+```{r}
+tabledf <- data.frame(Type = c("U.S. vaccination levels(recent years only)",
+                                  "Californian vaccination levels"),
+                     DTP1 = c(98,89.8),
+                      HepB_BD = c(68,92.26),
+                      Pol3 =c(93.5,90.2),
+                      MMR = c(91.62,89.79))
+tabledf
+```
+
+
+Using t-test to compare the means:
+
+```{r}
+#t.test((tabledf$Type == "U.S. vaccination levels(recent years only)"), 
+#       (tabledf$Type == "Californian vaccination levels"))
+compare_ts_districts_DTP <- t.test(usVaccines_latestData_const[,"DTP1"],
+                                   districts_log[,"WithDTP"])
+compare_ts_districts_DTP
+```
+
+A	Welch’s	unequal	variances independent	sample	t-test	was	performed	to compare	
+	Californian vaccination levels to U.S. vaccination levels for DTP.	The	mean	rate	for	the	recent years	for U.S. vaccination 98;	for	California vaccination level,	89.79.	The	t-test	found	that	the	difference	was	statistically	significant	at	p<<0.05,	t(495)	=	18.557,	p	=	2.2e-16(the	degrees	of	freedom	is	adjusted	to	account	for	the	unequal	variances	of	the	groups).	The	95%	confidence	interval	for	the	difference	was	7.2237	to	8.934,	which	does	not	include	0. Since the CI doesn't contain 0, we don't think it's likely that the real difference is 0. Since the CI is narrow we have less uncertainty.
+In	summary,	it	seems	that	the overall U.S  Vaccination rate for DTP was better than California vaccination rate which makes sense as all the states data is included in the us vaccination dataset.
+
+Doing the Bayesian version of the t-test
+
+```{r}
+bestout <- BESTmcmc(usVaccines_latestData_const[,"DTP1"],
+                                   districts_log[,"WithDTP"])
+
+```
+```{r}
+bestout
+plot(bestout)
+```
+A	Bayesian	t-test	was	performed	using	the	BESTmcmc	function	in	the	R	BEST	
+package	to	to compare	Californian vaccination levels to U.S. vaccination levels for DTP.10002	simulations	were	saved.	The	Rhats	for	parameters	were	all	reported	as	1, suggesting that	the	sampling converged	successfully and	the	results	are	interpretable.	The	MCMC	sampling	found	a	mean	difference of	4.45 between the	vaccination levels	between the 2 datasets. The	95%	HDI	for	the	difference	was	3.86	to	5.04 (i.e.,	there’s	a	95%	chance	that	the	true difference	lies	within	this	range).	None	of	the	samples	had	a	difference	of	less	than	0,	meaning	that	the	probability	that	the	difference	is	0	is	extremely	low.	In	summary,	the	analysis	provides	very	strong	evidence	that the	overall U.S  Vaccination rate was better than California vaccination rate for DTP which makes sense as all the states data is included in the us vaccination dataset.
+
+Doing the same for HepB_BD, Pol3 and MMR
+
+```{r}
+compare_ts_districts_HepB_BD <- t.test(usVaccines_latestData_const[,"HepB_BD"],
+                                   districts_log[,"WithHepB"])
+compare_ts_districts_HepB_BD
+```
+
+A	Welch’s	unequal	variances independent	sample	t-test	was	performed	to compare	
+	Californian vaccination levels to U.S. vaccination levels for HepB.	The	mean	rate	for	the	recent years	for U.S. vaccination 68.87;	for	California vaccination level,	92.26.	The	t-test	found	that	the	difference	was	statistically	significant	at	p<<0.05,	t(7.89)	=	-15.079,	p	=	4.244e-07 (the	degrees	of	freedom	is	adjusted	to	account	for	the	unequal	variances	of	the	groups).	The	95%	confidence	interval	for	the	difference	was	-26.97	to	-19.80,	which	does	not	include	0. Since the CI doesn't contain 0, we don't think it's likely that the real difference is 0. Since the CI is narrow we have less uncertainty.
+In	summary,	it	seems	that	the overall U.S  Vaccination rate for HepB was worse than California vaccination rate which could be possible since california got a mandate for children to get vaccination for HEPB in 1997 while teh rest of the states didn't.
+
+```{r}
+bestout_WithHepB <- BESTmcmc(usVaccines_latestData_const[,"HepB_BD"],
+                                   districts_log[,"WithHepB"])
+bestout_WithHepB
+plot(bestout_WithHepB)
+```
+
+A	Bayesian	t-test	was	performed	using	the	BESTmcmc	function	in	the	R	BEST	
+package	to	to compare	Californian vaccination levels to U.S. vaccination levels for hepB_BD	simulations	were	saved.	The	Rhats	for	parameters	were	all	reported	as	1, suggesting that	the	sampling converged	successfully and	the	results	are	interpretable.	The	MCMC	sampling	found	a	mean	difference of	-26.4 between the	vaccination levels	between the 2 datasets. The	95%	HDI	for	the	difference	was	-30.9	to	-22.3 (i.e.,	there’s	a	95%	chance	that	the	true difference	lies	within	this	range).	None	of	the	samples	had	a	difference	of	greater	than	0,	meaning	that	the	probability	that	the	difference	is	0	is	extremely	low.	In	summary,	the	analysis	provides	very	strong	evidence	that the	overall U.S  Vaccination rate was worse than California vaccination rate for HepB_BD. This could be possible since california got a mandate for children to get vaccination for HEPB in 1997 while the rest of the states didn't.
+
+```{r}
+compare_ts_districts_Pol3 <- t.test(usVaccines_latestData_const[,"Pol3"],
+                                   districts_log[,"WithPolio"])
+compare_ts_districts_Pol3
+
+```
+
+A	Welch’s	unequal	variances independent	sample	t-test	was	performed	to compare	
+	Californian vaccination levels to U.S. vaccination levels for Polio.	The	mean	rate	for	the	recent years	for U.S. vaccination 93.5;	for	California vaccination level,	90.20.	The	t-test	found	that	the	difference	was	statistically	significant	at	p<<0.05,	t(193.34)	=	7.2169,	p	=	1.182e-11 (the	degrees	of	freedom	is	adjusted	to	account	for	the	unequal	variances	of	the	groups).	The	95%	confidence	interval	for	the	difference	was	2.395026	to	4.196402,	which	does	not	include	0. Since the CI doesn't contain 0, we don't think it's likely that the real difference is 0. Since the CI is narrow we have less uncertainty.
+In	summary,	it	seems	that	the overall U.S  Vaccination rate for polio was better than California vaccination rate which makes sense as all the states data is included in the us vaccination dataset.
+
+```{r}
+
+bestout_polio <- BESTmcmc(usVaccines_latestData_const[,"Pol3"],
+                                   districts_log[,"WithPolio"])
+bestout_polio
+plot(bestout_polio)
+```
+
+
+A	Bayesian	t-test	was	performed	using	the	BESTmcmc	function	in	the	R	BEST	
+package	to	to compare	Californian vaccination levels to U.S. vaccination levels for Polio	simulations	were	saved.	The	Rhats	for	parameters	were	all	reported	as	1, suggesting that	the	sampling converged	successfully and	the	results	are	interpretable.	The	MCMC	sampling	found	a	mean	difference of	-0.53 between the	vaccination levels	between the 2 datasets. The	95%	HDI	for	the	difference	was	-1.36	to	0.279 (i.e.,	there’s	a	95%	chance	that	the	true difference	lies	within	this	range).	
+Since the HDI contains 0, there is a chance that there is no credible difference between the two groups. We can also see an expression 89.5% < 0 < 10.5% - This expression shows the proportion of mean
+differences in the MCMC run that were negative vs the the proportion that were positive. Here we can see that 10.5% of the mean differences in the distribution were positive meaning Californian vaccination levels were just slightly higher than the U.S. vaccination levels.
+Basically the means are very close to each other.
+
+Since we are getting two different results from the frequentist and bayesian approach and since bayesian approach doesn't work that well on small datasets like ours and that our point estimate is 0.53 suggesting barely any difference we will go ahead with the frequentist test answer and conclude that overall U.S  Vaccination rate for polio was slightly better than California vaccination rate.
+
+
+```{r}
+compare_ts_districts_MMR <- t.test(usVaccines_latestData_const[,"MCV1"],
+                                   districts_log[,"WithMMR"])
+compare_ts_districts_MMR
+
+```
+
+A	Welch’s	unequal	variances independent	sample	t-test	was	performed	to compare	
+	Californian vaccination levels to U.S. vaccination levels for MMR.	The	mean	rate	for	the	recent years	for U.S. vaccination 91.62;	for	California vaccination level,	89.787.	The	t-test	found	that	the	difference	was	statistically	significant	at	p<<0.05,	t(87.284)	=	3.6552,	p	=	0.0004383 (the	degrees	of	freedom	is	adjusted	to	account	for	the	unequal	variances	of	the	groups).	The	95%	confidence	interval	for	the	difference	was	0.8385	to	2.837,	which	does	not	include	0. Since the CI doesn't contain 0, we don't think it's likely that the real difference is 0. Since the CI is narrow we have less uncertainty.
+In	summary,	it	seems	that	the overall U.S  Vaccination rate for MMR was better than California vaccination rate which makes sense as all the states data is included in the us vaccination dataset.
+
+```{r}
+
+bestout_MMR <- BESTmcmc(usVaccines_latestData_const[,"MCV1"],
+                                   districts_log[,"WithMMR"])
+bestout_MMR
+plot(bestout_MMR)
+```
+
+
+A	Bayesian	t-test	was	performed	using	the	BESTmcmc	function	in	the	R	BEST	
+package	to	to compare	Californian vaccination levels to U.S. vaccination levels for MMR	simulations	were	saved.	The	Rhats	for	parameters	were	all	reported	as	1, suggesting that	the	sampling converged	successfully and	the	results	are	interpretable.	The	MCMC	sampling	found	a	mean	difference of	-1.97 between the	vaccination levels	between the 2 datasets. The	95%	HDI	for	the	difference	was	-2.56	to	-1.37 (i.e.,	there’s	a	95%	chance	that	the	true difference	lies	within	this	range).	None	of	the	samples	had	a	difference	of	greater	than	0,	meaning	that	the	probability	that	the	difference	is	0	is	extremely	low.	In	summary,	the	analysis	provides	very	strong	evidence	that the	overall U.S  Vaccination rate was worse than California vaccination rate for MMR. 
+
+Since we are getting opposite results from the frequentist and Bayesian approach and since bayesian approach showed us that our point estimate is 1.97 suggesting barely any difference we will go ahead with the frequentist test answer and conclude that the overall U.S  Vaccination rate for MMR was better than California vaccination rate.
+
+
+## 4. _Comparison of public and private schools (i.e., from the All Schools data)_ 
+
+### a. _What proportion of public schools reported vaccination data?_
+
+_Using the cleaned dataset_
+```{r}
+public_schools_count <- nrow(subset(schools_sqrt , PUBLIC..PRIVATE == 'PUBLIC'
+                                    &  REPORTED == 'Y'))
+
+100*(public_schools_count / nrow(schools_sqrt))
+```
+79.97 schools were public which reported their vaccination data.
+
+Checking proportion how many public schools reported in just the public schools domain 
+
+```{r}
+100*(public_schools_count / nrow(subset(schools_sqrt , PUBLIC..PRIVATE == 'PUBLIC')))
+```
+All the public schools reported their vaccination data.
+
+_Using the original dataset to see what was the actual proportion_
+
+```{r}
+public_schools_count_og <- nrow(subset(schools , PUBLIC..PRIVATE == 'PUBLIC'
+                                    &  REPORTED == 'Y'))
+
+100*(public_schools_count_og / nrow(schools))
+```
+75.65 schools were public which reported their vaccination data.
+
+Checking proportion how many public schools reported in just the public schools domain 
+
+```{r}
+100*(public_schools_count_og / nrow(subset(schools_sqrt , PUBLIC..PRIVATE == 'PUBLIC')))
+```
+97.41% of the public schools reported their vaccination data.
+
+### b. _What proportion of private schools reported vaccination data?_   
+
+_Using the cleaned dataset_
+```{r}
+private_schools_count <- nrow(subset(schools_sqrt ,
+                                     PUBLIC..PRIVATE == 'PRIVATE'
+                                    &  REPORTED == 'Y'))
+
+100*(private_schools_count / nrow(schools_sqrt))
+```
+Only 20 percent of the schools which were private reported their vaccination data.
+
+Checking proportion how many public schools reported in just the public schools domain 
+
+```{r}
+100*(private_schools_count / nrow(subset(schools_sqrt , PUBLIC..PRIVATE == 'PRIVATE')))
+subset(schools_sqrt , PUBLIC..PRIVATE == 'PRIVATE' &  REPORTED == 'N')
+```
+Only one school in Pleasanton city didn't report their vaccination records.
+
+_Using the origial data set_
+
+```{r}
+private_schools_count_og <- nrow(subset(schools ,
+                                     PUBLIC..PRIVATE == 'PRIVATE'
+                                    &  REPORTED == 'Y'))
+
+100*(private_schools_count_og / nrow(schools))
+```
+Only 18.92 percent of the schools which were private reported their vaccination data.
+
+Checking proportion how many public schools reported in just the public schools domain 
+
+```{r}
+100*(private_schools_count_og / nrow(subset(schools , PUBLIC..PRIVATE == 'PRIVATE')))
+```
+84.72% reported their vaccination data for private schools.
+
+### c. _Was there any credible difference in reporting between public and private schools?_  
+
+Not really, checking both with cleaned and uncleaned dataset, both show high proportions for reporting their data.
+
+Let's validate this with a chi squared test
+
+First for original data
+```{r}
+private_schools_count_og_N <- nrow(subset(schools,
+                                     PUBLIC..PRIVATE == 'PRIVATE'
+                                    &  REPORTED == 'N'))
+public_schools_count_og_N <- nrow(subset(schools,
+                                     PUBLIC..PRIVATE == 'PUBLIC'
+                                    &  REPORTED == 'N'))
+
+SchoolOg <- matrix(c(public_schools_count_og, public_schools_count_og_N,
+                     private_schools_count_og, private_schools_count_og_N), 
+                   ncol=2, byrow=TRUE)
+colnames(SchoolOg) <- c('NotReported','Reported')
+rownames(SchoolOg) <- c('Public','Private')
+SchoolOg <- as.table(SchoolOg)
+addmargins(SchoolOg)
+```
+
+
+
+```{r}
+chisqOut <- chisq.test(SchoolOg)
+chisqOut
+```
+The reported value of chi-square is 400.49 on 1 degree of freedom. The df is 1 as its a 2x2 table and df was calculated using the formula of (2-1)*(2-1). The chi-squared value is very high (for 1 df and alpha level of 0.05 the chi-squared critical value is 3.84) and hence we can reject the null hypothesis and can say that the two public and private schools are non independent and that there is no credible difference. 
+
+Now checking for the cleaned data:
+
+```{r}
+private_schools_count_N <- nrow(subset(schools_sqrt,
+                                     PUBLIC..PRIVATE == 'PRIVATE'
+                                    &  REPORTED == 'N'))
+public_schools_count_N <- nrow(subset(schools_sqrt,
+                                     PUBLIC..PRIVATE == 'PUBLIC'
+                                    &  REPORTED == 'N'))
+
+SchoolClean <- matrix(c(public_schools_count, public_schools_count_N,
+                     private_schools_count, private_schools_count_N), 
+                   ncol=2, byrow=TRUE)
+colnames(SchoolClean) <- c('NotReported','Reported')
+rownames(SchoolClean) <- c('Public','Private')
+SchoolOg <- as.table(SchoolClean)
+addmargins(SchoolClean)
+```
+
+
+
+```{r}
+chisqOutClean <- chisq.test(SchoolClean)
+chisqOutClean
+```
+The reported value of chi-square is 0.5612 on 1 degree of freedom. The df is 1 as its a 2x2 table and df was calculated using the formula of (2-1)*(2-1). The chi-squared value is very low (for 1 df ) and we can see that P-value is 0.45 which is greater than alpha level of 0.05 and hence we fail to reject the null hypothesis and can say that the two public and private schools are independent for the cleaned dataset and that there is credible difference.
+
+Overall for the original dataset we can see that there is credible difference.
+
+
+
+
+### d. _Does the proportion of students with up-to-data vaccinations vary from county to county?_
+```{r}
+total_up_to_date <- sum(schools_sqrt$UP_TO_DATE)
+by_county <- schools_sqrt %>%
+   group_by(COUNTY) %>%
+   summarise(Proportion.Percent = (sum(UP_TO_DATE)/total_up_to_date)*100)
+by_county[order(by_county$Proportion.Percent, decreasing=TRUE),]
+```
+As we can see in the table above, the proportion of students with up-to-data vaccinations vary from county to county and LA has the highest rate of up to date vaccinations which is 23.9% and then the second one in San Diego with 8% (possibly due to the vaccination mandate in 1997).
+
+Using Anova frequentist and bayesian to test this further:
+```{r}
+aov_schools_sqrt <- schools_sqrt
+aov_schools_sqrt$COUNTY <- as.factor(aov_schools_sqrt$COUNTY)
+county_aov <- aov(UP_TO_DATE ~ COUNTY, data = aov_schools_sqrt)
+summary(county_aov)
+```
+ 
+We can see that we get significant results and that we can reject the null hypothesis that students with up to date vaccinations do not vary from county to county. Looking at the results we see - F(57,6924) = 10.47, p<<0.05. Hence, we can say that yes that atleast some county see proportion of students with up to date vaccinations.
+
+Bayesian Approach:
+
+```{r}
+bayesaov <- anovaBF(UP_TO_DATE ~ COUNTY, data = aov_schools_sqrt) # Calc Bayes Factors
+mcmcaov <- posterior(bayesaov,iterations=10000) # Run mcmc iterations
+#summary(mcmcaov)
+bayesaov
+```
+Seeing that our value is 7.109797e+86 we can say that we have strong evidence that the proportion varies by county.
+In conclusion, we can see that the proportions vary by county  but can’t be sure which of the county and we can see that using the group by results that was shown at the beginning of this question.
+
+
+
+## 5.	_Conclusion Paragraph for Vaccination Rates_
+
+_Provide one or two sentences of your professional judgment about where California school districts stand with respect to vaccination rates and in the larger context of the U.S._
+
+Looking at the analysis so far, with or without outlier in the school data set we could see a very high proportion of children being vaccinated and as we just saw above, in the whole of the dataset of schools that we are provided, two major cities of California are topping the charts for highest vaccination rate. 
+Comparing the California school districts rate with that of the whole of U.S we can see that California is doing a great job in terms of vaccinating children.
+
+# 6. _Inferential reporting about districts_
+
+_For every item below except question c, use PctChildPoverty, PctFamilyPoverty, Enrolled, and TotalSchools as the four predictors. Explore the data and transform variables as necessary to improve prediction and/or interpretability. Be sure to include appropriate diagnostics and modify your analyses as appropriate. _ 
+ 
+### a. _Which of the four predictor variables predicts the percentage of all enrolled students with belief exceptions?_
+
+```{r}
+# creating a new df of the cleaned data for better readability
+districts_log_belief <- subset(districts_log, select = c(PctChildPoverty, 
+                                                         PctFamilyPoverty,
+                                                         Enrolled, 
+                                                         TotalSchools,
+                                                         PctBeliefExempt))
+
+districts_log_belief %>% pivot_longer(-PctBeliefExempt, names_to="variable", values_to="value", values_drop_na = TRUE) %>%
+ggplot(aes(x = value, y = PctBeliefExempt)) + geom_point() +
+geom_smooth(method = "lm") + facet_wrap( ~ variable, scales = "free")
+```
+Looking at the above graphs we can see that there is slight negative correlation in between the variables with respect to percentage of students with belief exceptions.
+
+Let's check the pairs plot to examine plots and correlation:
+
+
+```{r}
+pairs.panels(districts_log_belief)
+
+```
+We can see that PctChildPoverty, PctFamilyPoverty and Enrolled are almost normal and TotalSchools is slightly skewed (but alot better than before doing the log transformation) and PctBeliefExempt is right skewed.
+We can also see that there is high correlation between Percentage of children in district living below the poverty line and Percentage of families in district living below the poverty line which makes sense as they can be inter related i.e they must be children of the families staying in districts below the poverty line. 
+There is also high correlation between totalschools and enrolled students which makes sense as there is interloping of the districts with a child being enrolled and in the district of the school.
+Rest of the correlations are low which is great for linear modelling.
+
+```{r}
+belief_lm <- lm(PctBeliefExempt ~ ., data=districts_log_belief)
+```
+
+
+Lets check multicolinarity in the model:
+
+```{r}
+vif(belief_lm)
+```
+Values in the range of 4 to 5 are regarded as being moderate to high for VIF
+
+```{r}
+vif(lm(PctBeliefExempt ~ . - TotalSchools, data=districts_log_belief))
+```
+
+Looks like removing totalschools reduces VIF for enrolled 
+```{r}
+vif(lm(PctBeliefExempt ~ . - PctChildPoverty, data=districts_log_belief))
+```
+
+Looks like removing PctChildPoverty reduces VIF for PctFamilyPoverty
+
+Since the VIF for these columns is below 10 and looking at model where we removed columns to check for VIF it seems that since TotalSchools and Enrolled are highly correlated as shown in the pairs plot and Child and Family poverty columns are highly correlated we get a moderate VIF of value 6.
+We will go with the original model with all four columns as the VIF is moderate.
+
+Checking the residual plots
+
+```{r}
+plot(belief_lm, which=2:5)
+```
+We can see at the Cook's distance graph that observation number 760 only has 0.20 influence on the regression line, 186 has 0.10 and 299 has around 0.18.
+Looking at the Residuals vs Leverage graph we can see that nothing is in the Cook's distance which is good. The q-q plot tells us how normally distributed the residuals are which is a basic assumption of the linear regression. Looking at the graph we can see that at the end we have more variability than the model can account for but overall the model is not bad.
+Now checking our model summary
+```{r}
+summary(belief_lm)
+```
+
+We can see that the median of -1.272 is close to 0. We can also see that the f-statistic is F(4,695)
+= 29.65, the r-squared and adjusted r squared is 0.1458 and 0.1409 respectively which isn’t a huge value but the p-value is significant. Looking at the columns we can see that
+PctFamilyPoverty significantly predicts PctBeliefExempt (b = -0.259, t(695)=-3.309, p<.001)
+Enrolled significantly predicts PctBeliefExempt (b = -2.618, t(695)=-5.284, p<.001)
+TotalSchools significantly predicts PctBeliefExempt (b = -1.78, t(695)=2.62, p<.01)
+PctChildPPoverty is not significant as p value of 0.975 is greater than the alpha level of 0.05.
+
+To see which predictors have the biggest impact on the result, we will compare standardized coefficients, i.e., those based on standardized variables:
+
+```{r}
+summary(lm.beta(belief_lm))
+```
+
+
+The significant variables are the percentage of family poverty, the number of enrolled students and number of different schools in the district.
+It means the more poverty in the area, less belief exception,  more enrolled students less belief exception. and one unit change in school can lead to belief expection to increase.
+Since enrolled and total schools have log values so every 1 standard deviation increase in the log of number of students enrolled in the district will have 2.61 standard deviation decrease in the percentage of belief exception.  Similarly every 1 standard deviation increase in the log of number of total schools in the district will have 1.78 standard deviation increase in the percentage of belief exception and 1 SD increase in percentage of families in district living below the poverty line will have 0.259 decrease in the percentage of belief exception.
+
+
+Doing the Bayesian Test for the same:
+
+```{r}
+belief_lmBF <- lmBF(PctBeliefExempt ~ ., data=districts_log_belief,
+                  posterior=TRUE, iterations=10000, rnd.seed=772)
+summary(belief_lmBF)
+```
+
+In the output displayed above, we have parameter estimates for the B-weights of each of our predictions (the column labeled “Mean”).
+In the second section, we have the 2.5% and 97.5% boundaries of the HDI for each of the B-weights.These boundaries mark the edges of the central region of the posterior distribution for each B-weight. So PctChildPoverty predictor has a lower bound of -0.099  to upper bound at 0.1027, since the HDI contains 0 the observed differences could be due to chance.
+The PctFamilyPoverty predictor has a lower bound of -0.406 to upper bound of -0.1024, Since the HDI does not contain 0 we have credible evidence that there is a difference in between the variables.
+The Enrolled predictor has HDI from -3.52 to -1.60 and totalschools has HDI from 0.44 to 3.04 and since both these preictors dont span 0 we have credible evidence that the difference in between the variables.
+Also we can see that the means from our bayesian test match the estimates we got from the frequentist model.
+
+```{r}
+# running the same model without the iterations to get bayes factor value
+belief_lmBF_out <- lmBF(PctBeliefExempt ~
+                          PctChildPoverty+PctFamilyPoverty+Enrolled+TotalSchools
+                        ,data=districts_log_belief, 
+                        rnd.seed=772)
+belief_lmBF_out
+
+```
+
+We get a very high bayes factor showing us that our results are significant.
+In conclusion, a linear regression was performed to estimate the percentage of all enrolled students with belief exceptions with use of PctChildPoverty, PctFamilyPoverty, Enrolled , and TotalSchools as the four predictors. In the data cleaning process to remove skewness we took log transformation on Enrolled and Total schools columns. In the bivariate analysis we saw that the remaining or little skewness didn't cause any major issues and that the data was linear to carry out linear regression. Using the result from both the Bayesian and frequentist approach we got evidence that PctFamilyPoverty , Enrolled and TotalSchools are good predictors for PctBeliefExempt.
+
+### b. _Which of the four predictor variables predicts the percentage of all enrolled students with completely up-to-date vaccines?_
+
+
+```{r}
+# creating a new df of the cleaned data for better readability
+districts_log_uptodate <- subset(districts_log, select = c(PctChildPoverty, 
+                                                         PctFamilyPoverty,
+                                                         Enrolled, 
+                                                         TotalSchools,
+                                                         PctUpToDate))
+
+districts_log_uptodate %>% pivot_longer(-PctUpToDate, names_to="variable", values_to="value",
+                                        values_drop_na = TRUE) %>%
+  ggplot(aes(x = value, y = PctUpToDate)) + geom_point() +
+  geom_smooth(method = "lm") + facet_wrap( ~ variable, scales = "free")
+```
+Looking at the above graphs we can see that there is an almost a positive correlation in between the variables with respect to percentage of students with completely up-to-date vaccines. 
+
+Let's check the pairs plot to examine plots and correlation:
+
+
+```{r}
+pairs.panels(districts_log_uptodate)
+
+```
+We can see that PctChildPoverty, PctFamilyPoverty, PctUpToDate and Enrolled are almost normal and TotalSchools is slightly skewed (but alot better than before doing the log transformation).
+We can also see that there is high correlation between Percentage of children in district living below the poverty line and Percentage of families in district living below the poverty line which makes sense as they can be inter related i.e they must be children of the families staying in districts below the poverty line. 
+There is also high correlation between totalschools and enrolled students which makes sense as there is interloping of the districts with a child being enrolled and in the district of the school.
+Rest of the correlations are low which is great for linear modelling.
+
+```{r}
+uptodate_lm <- lm(PctUpToDate ~ ., data=districts_log_uptodate)
+```
+
+Lets check multicolinarity in the model:
+
+```{r}
+vif(uptodate_lm)
+```
+Values in the range of 4 to 5 are regarded as being moderate to high for VIF
+
+```{r}
+vif(lm(PctUpToDate ~ . - TotalSchools, data=districts_log_uptodate))
+```
+
+Looks like removing totalschools reduces VIF for enrolled 
+```{r}
+vif(lm(PctUpToDate ~ . - PctChildPoverty, data=districts_log_uptodate))
+```
+
+Looks like removing PctChildPoverty reduces VIF for PctFamilyPoverty
+
+Since the VIF for these columns is below 10 and looking at model where we removed columns to check for VIF it seems that since TotalSchools and Enrolled are highly correlated as shown in the pairs plot and Child and Family poverty columns are highly correlated we get a moderate VIF of value 6.
+We will go with the original model with all four columns as the VIF is moderate.
+
+Checking the residual plots
+
+```{r}
+plot(uptodate_lm, which=2:5)
+```
+We can see at the Cook's distance graph that observation number 832 only has 0.08 influence on the regression line, 685 has 0.10 and 46 has around 0.07.
+Looking at the Residuals vs Leverage graph we can see that nothing is in the Cook's distance which is good. The q-q plot tells us how normally distributed the residuals are which is a basic assumption of the linear regression. Looking at the graph we can see that at the start we have more variability than the model can account for but overall the model is good.
+
+Now checking our model summary
+```{r}
+summary(uptodate_lm)
+```
+
+We can see that the median of 1.312 is close to 0. We can also see that the f-statistic is F(4,695)
+= 26.66, the r-squared and adjusted r squared is 0.133 and 0.128 respectively which isn’t a huge value but the p-value is significant. Looking at the columns we can see that
+PctFamilyPoverty significantly predicts PctUpToDate (b = 0.03017, t(695)=2.784, p<.01)
+Enrolled significantly predicts PctUpToDate (b = 4.39, t(695)= 5.202, p<.001)
+TotalSchools significantly predicts PctUpToDate (b = -3.103, t(695)=-2.673, p<.01)
+PctChildPPoverty is not significant as p value of 0.736 is greater than the alpha level of 0.05.
+
+To see which predictors have the biggest impact on the result, we will compare standardized coefficients, i.e., those based on standardized variables:
+
+```{r}
+summary(lm.beta(uptodate_lm))
+```
+
+
+The significant variables are the percentage of family poverty, the number of enrolled students and number of different schools in the district.
+It means the more poverty in the area, more percentage of students with completely up-to-date vaccines,  more enrolled students more up to date vaccination and one unit change in school can lead to decrease in up to date vaccination which makes sense as more new students in the new school and it will take some time for all of them to be vaccinated.
+Since enrolled and total schools have log values so every 1 standard deviation increase in the log of number of students enrolled in the district will have 4.39 standard deviation increase in the percentage of up to date vaccination.  Similarly every 1 standard deviation increase in the log of number of total schools in the district will have 3.10 standard deviation decrease in the percentage of up to date vaccination and 1 SD increase in percentage of families in district living below the poverty line will have 0.37 increase in the percentage of up to date vaccinations.
+
+
+Doing the Bayesian Test for the same:
+
+```{r}
+belief_lmBF <- lmBF(PctBeliefExempt ~ ., data=districts_log_belief,
+                  posterior=TRUE, iterations=10000, rnd.seed=772)
+summary(belief_lmBF)
+```
+
+In the output displayed above, we have parameter estimates for the B-weights of each of our predictions (the column labeled “Mean”).
+In the second section, we have the 2.5% and 97.5% boundaries of the HDI for each of the B-weights.These boundaries mark the edges of the central region of the posterior distribution for each B-weight. So PctChildPoverty predictor has a lower bound of -0.100  to upper bound at 0.100, since the HDI contains 0 the observed differences could be due to chance.
+The PctFamilyPoverty predictor has a lower bound of -0.405 to upper bound of -0.09761, Since the HDI does not contain 0 we have credible evidence that there is a difference in between the variables.
+The Enrolled predictor has HDI from -3.51 to -1.58 and totalschools has HDI from 0.42 to 3.06 and since both these preictors dont span 0 we have credible evidence that the difference in between the variables.
+Also we can see that the means from our bayesian test don't match the estimates we got from the frequentist model.
+
+```{r}
+# running the same model without the iterations to get bayes factor value
+uptodate_lmBF_out <- lmBF(PctUpToDate ~
+                          PctChildPoverty+PctFamilyPoverty+Enrolled+TotalSchools
+                        ,data=districts_log_uptodate, 
+                        rnd.seed=772)
+uptodate_lmBF_out
+
+```
+
+We get a very high bayes factor of 2.45 e+17 showing us that our results are significant.
+In conclusion, a linear regression was performed to estimate the percentage of all enrolled students with up to date vaccination with use of PctChildPoverty, PctFamilyPoverty, Enrolled, and TotalSchools as the four predictors. In the data cleaning process to remove skewness we took log transformation on Enrolled and Total schools columns. In the bivariate analysis we saw that the remaining or little skewness didn't cause any major issues and that the data was linear to carry out linear regression. Using the result from both the Bayesian and frequentist approach we got evidence that PctFamilyPoverty , Enrolled and TotalSchools are good predictors for PctUpToDate.
+ 
+
+
+
+### c. _Using any set or combination of predictors that you want to use, what’s the best R-squared you can achieve in predicting the percentage of all enrolled students with completely up-to-date vaccines while still having an acceptable regression?_
+
+## Checking with the cleaned model where PctFreeMeal was removed.
+
+```{r}
+districts_log %>% pivot_longer(-c(PctUpToDate,DistrictName), names_to="variable", values_to="value",
+                                        values_drop_na = TRUE) %>%
+  ggplot(aes(x = value, y = PctUpToDate)) + geom_point() +
+  geom_smooth(method = "lm") + facet_wrap( ~ variable, scales = "free")
+```
+WithDTP, WithHepB, WithMMR, WithPolio show a good positive correlation, Enrolled, PctChildPoverty, PctFamilyPoverty, TotalSchools show sub par or an almost positive correlation, PctBeliefExempt shows a negative correlation and PctMedicalExempt shows an almost about to happen negative correlation with respect to percentage of students with completely up-to-date vaccines.
+
+Let's check the pairs plot to examine plots and correlation:
+
+
+```{r}
+pairs.panels(districts_log)
+
+```
+We can see that PctChildPoverty, PctFamilyPoverty, PctUpToDate and Enrolled are almost normal and TotalSchools is slightly skewed (but alot better than before doing the log transformation).
+We can also see that there is high correlation between Percentage of children in district living below the poverty line and Percentage of families in district living below the poverty line which makes sense as they can be inter related i.e they must be children of the families staying in districts below the poverty line. 
+There is also high correlation between totalschools and enrolled students which makes sense as there is interloping of the districts with a child being enrolled and in the district of the school.
+Rest of the correlations are low which is great for linear modelling.
+
+
+Let's create models and find which model has the least multicolinarity and then analyze it further
+
+```{r}
+vif(lm(PctUpToDate ~ .-DistrictName, data=districts_log))
+```
+
+We are removing column PctChildPoverty as from our previous models and bi variate analysis we can see that it is having multicolinarity with PctFamilyPoverty and TotalSchools as it has multi colinarity with Enrolled.
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName, data=districts_log))
+```
+Checking dropping which column can give us least amount of multicolinarity for the group dtp, polio, mmr and hepb
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP
+         , data=districts_log))
+```
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithMMR
+         , data=districts_log))
+```
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithPolio
+         , data=districts_log))
+```
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithHepB
+         , data=districts_log))
+```
+
+Looking at the above analysis it looks like removing HepB PctBeliefExempt reduces and removing WithDTP reduces the multicolinarity best from polio, mmr and hepb variable
+
+Checking if removing both these columns gives us a good model that doesnt have multicolinarity
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB
+         , data=districts_log))
+```
+Since we still don't get a value less than 10 for WithPolio and WithMMR we will remove Polio and we get the least multicolinarity and since we already saw that one child getting one vaccine is very likely to get all the other vaccines, we can just use WithMMR to see if getting a shot of a vaccine is a good predictor for having up to date vaccinations.
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB -WithPolio
+         , data=districts_log))
+# saving the model in a varibale to carry out further analysis
+lm_highR2 <- lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB -WithPolio
+         , data=districts_log)
+```
+Checking the residual plots
+
+```{r}
+plot(lm_highR2, which=2:5)
+```
+We can see at the Cook's distance graph that observation number 832 only has 0.12 influence on the regression line, 71 has 0.09 and 59 has around 0.10.
+Looking at the Residuals vs Leverage graph we can see that nothing is in the Cook's distance which is good. The q-q plot tells us how normally distributed the residuals are which is a basic assumption of the linear regression. Looking at the graph we can see that at the model does not have any such variability than the model can't account for and the model look pretty good.
+
+
+Now checking our model summary
+```{r}
+summary(lm_highR2)
+```
+
+We can see that the median of -0.181 is very close to 0 and comparing it our previous models it is the best we have got. We can also see that the f-statistic is F(6,693)
+= 265.1, the r-squared and adjusted r squared is 0.696 and 0.694 respectively which is a good value and the p-value of 2.2e-16 of the overall model which is significant at alpha level of 0.05. Looking at the columns we can see that WithMMR significantly predicts PctUpToDate (b = 1.178, t(693)=25.791, p<.001)
+PctBeliefExempt significantly predicts PctUpToDate (b = 0.167, t(693)= 2.904, p<.01). Rest of the columns are not significant at alpha level of 0.05
+
+Now we will again check if including PctFreeMeal gives a better R2 and more columns that can be good predictors and then check which predictors have the biggest impact on the result by comparing standardized coefficents.
+
+
+
+## Checking with the a new model where PctFreeMeal is included and we also have log transformation
+
+```{r}
+districts_log_PctFreeMeal <- districts_log
+districts_log_PctFreeMeal$PctFreeMeal <- districts$PctFreeMeal
+dim(districts_log_PctFreeMeal)
+```
+```{r}
+# creating a new df of the cleaned data for better readability
+districts_log_PctFreeMeal %>% pivot_longer(-c(PctUpToDate,DistrictName), names_to="variable", values_to="value",
+                                        values_drop_na = TRUE) %>%
+  ggplot(aes(x = value, y = PctUpToDate)) + geom_point() +
+  geom_smooth(method = "lm") + facet_wrap( ~ variable, scales = "free")
+```
+WithDTP, WithHepB, WithMMR, WithPolio show a good positive correlation, Enrolled, PctChildPoverty, PctFamilyPoverty, TotalSchools, PctFreeMeal show sub par or an almost positive correlation, PctBeliefExempt shows a negative correlation and PctMedicalExempt shows an almost about to happen negative correlation with respect to percentage of students with completely up-to-date vaccines.
+
+Let's check the pairs plot to examine plots and correlation:
+
+
+```{r}
+pairs.panels(districts_log_PctFreeMeal)
+
+```
+We can see that PctChildPoverty, PctFamilyPoverty, PctUpToDate and Enrolled are almost normal and TotalSchools is slightly skewed (but alot better than before doing the log transformation).
+We can also see that there is high correlation between Percentage of children in district living below the poverty line and Percentage of families in district living below the poverty line which makes sense as they can be inter related i.e they must be children of the families staying in districts below the poverty line. 
+There is also high correlation between totalschools and enrolled students which makes sense as there is interloping of the districts with a child being enrolled and in the district of the school.
+PctFreeMeal and rest of the columns have low correlations which is great for linear modelling.
+
+
+Let's create models and find which model has the least multicolinarity and then analyze it further
+
+```{r}
+vif(lm(PctUpToDate ~ .-DistrictName, data=districts_log_PctFreeMeal))
+```
+
+We are removing column PctChildPoverty as from our previous models and bi variate analysis we can see that it is having multicolinarity with PctFamilyPoverty and TotalSchools as it has multi colinarity with Enrolled.
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName, 
+       data=districts_log_PctFreeMeal))
+```
+Checking dropping which column can give us least amount of multicolinarity for the group dtp, polio, mmr and hepb
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP
+         , data=districts_log_PctFreeMeal))
+```
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithMMR
+         , data=districts_log_PctFreeMeal))
+```
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithPolio
+         , data=districts_log_PctFreeMeal))
+```
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithHepB
+         , data=districts_log_PctFreeMeal))
+```
+
+Looking at the above analysis it looks like removing HepB PctBeliefExempt reduces and removing WithDTP reduces the multicolinarity best from polio, mmr and hepb variable
+
+Checking if removing both these columns gives us a good model that doesnt have multicolinarity
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB
+         , data=districts_log_PctFreeMeal))
+```
+Since we still don't get a value less than 10 for WithPolio and WithMMR we will remove Polio and we get the least multicolinarity and since we already saw that one child getting one vaccine is very likely to get all the other vaccines, we can just use WithMMR to see if getting a shot of a vaccine is a good predictor for having up to date vaccinations.
+
+```{r}
+vif(lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB -WithPolio
+         , data=districts_log_PctFreeMeal))
+# saving the model in a varibale to carry out further analysis
+lm_highR2_FreeMeal <- lm(PctUpToDate ~ .-PctChildPoverty -TotalSchools -DistrictName 
+       -WithDTP -WithHepB -WithPolio
+         , data=districts_log_PctFreeMeal)
+```
+Checking the residual plots
+
+```{r}
+plot(lm_highR2_FreeMeal, which=2:5)
+```
+We can see at the Cook's distance graph that observation number 685 only has 0.25 influence on the regression line, 22 has 0.13 and 821 has around 0.10.
+Looking at the Residuals vs Leverage graph we can see that nothing is in the Cook's distance which is good. The q-q plot tells us how normally distributed the residuals are which is a basic assumption of the linear regression. Looking at the graph we can see that at the model does have alittle variability at the lower end that the model can account for but the model look pretty good.
+
+
+Now checking our model summary
+```{r}
+summary(lm_highR2_FreeMeal)
+```
+
+We can see that the median of -0.272 is very close to 0. We can also see that the f-statistic is F(7,448) = 327, the r-squared and adjusted r squared is 0.8363 and 0.8337 respectively which is a good value and the p-value of 2.2e-16 of the overall model which is significant at alpha level of 0.05. Looking at the columns we can see that WithMMR significantly predicts PctUpToDate (b = 1.226, t(448)=30.4472, p<.001)
+PctBeliefExempt significantly predicts PctUpToDate (b = 0.196, t(448)= 4.013, p<.001). Rest of the columns are not significant at alpha level of 0.05
+
+Since we got a better R2 in this new model and the columns that were significant were same in the model (PctMedicalExempt was significant at more alpha levels in the model with PctFreeModel than without) so we will go ahead and choose the model with PctFreeModel column included and check beta weights to see which predictors have the biggest impact on the result, we will compare standardized coefficients, i.e., those based on standardized variables:
+
+```{r}
+summary(lm.beta(lm_highR2_FreeMeal))
+```
+
+The significant variables are the percentage of students in the district with the MMR vaccine and percentage of all enrolled students with belief exceptions.
+It means the if a student is vaccinated (since we are using MMR as a placeholder for all vaccines to remove multicolinarity we can assume that a student vaccinated by any of the vaccine i.e Polio, HepB, DTP) more up to date they are with their vaccination, more percentage of students with completely up-to-date vaccines,  more enrolled students with belief exception more up to date vaccination and one unit change in MMR vaccine can lead to increase in up to date vaccination which makes sense as more students are up to date with thier vaccination.
+ Similarly every 1 standard deviation increase in the percent of students with belief exception will have 1.960e-01 standard deviation increase in the percentage of up to date vaccination.
+
+
+Doing the Bayesian Test for both the models:
+
+```{r}
+lm_highR2_lmBF <- lmBF(PctUpToDate ~ .-PctChildPoverty -TotalSchools 
+                       -DistrictName 
+                       -WithDTP -WithHepB -WithPolio,
+                       data=districts_log,
+                       posterior=TRUE, iterations=10000)
+
+summary(lm_highR2_lmBF)
+```
+
+In the output displayed above, we have parameter estimates for the B-weights of each of our predictions (the column labeled “Mean”).
+In the second section, we have the 2.5% and 97.5% boundaries of the HDI for each of the B-weights.These boundaries mark the edges of the central region of the posterior distribution for each B-weight. So WIthMMR  predictor has a lower bound of 1.08  to upper bound at 1.262, and PctBeliefExempt has HDI from 0.05 to 0.27. Since the HDI for these 2 columns does not contains 0 we have credible evidence that there is a difference in between the variables.
+The DistrictComplete predictor has a lower bound of -1.057 to upper bound of 4.2051, PctMedicalExempt has -1.05 to 0.91, PctFamilyPoverty has -0.02 to 0.132 and enrolled has -0.197 to 0.6238. Since the HDI for these columns contains 0, the observed differences could be due to chance. 
+
+Also we can see that the means from our bayesian test are close to the estimates we got from the frequentist model.
+
+```{r}
+# running the same model without the iterations to get bayes factor value
+lm_highR2_out <- lmBF(PctUpToDate ~ .-PctChildPoverty -TotalSchools 
+                       -DistrictName 
+                       -WithDTP -WithHepB -WithPolio,
+                       data=districts_log)
+lm_highR2_out
+
+```
+
+We get a very high bayes factor of 7.484836e+171  showing us that our results are significant.
+
+Running Bayesian for data frame with PctFreeMeal column:
+
+```{r}
+#lm_highR2_lmBF_FreeMeal <- lmBF(PctUpToDate ~ .-PctChildPoverty -TotalSchools 
+#                       -DistrictName 
+#                       -WithDTP -WithHepB -WithPolio,
+#                       data=districts_log_PctFreeMeal,
+#                       posterior=TRUE, iterations=10000)
+
+```
+
+We can see that we get an Error in checkFormula(formula, data, analysis = "lm") : Predictors must not contain missing values when we run the above model hence we can't do a baysian model for this.
+
+In conclusion, a linear regression was performed to estimate the percentage of all enrolled students with up to date vaccination with use of WithMMR, DistrictComplete, PctBeliefExempt, PctMedicalExempt, PctFamilyPoverty and Enrolled as the predictors. In the data cleaning process to remove skewness we took log transformation on Enrolled and Total schools columns. In the bivariate analysis we saw that there was barely any visible skewness and there were no major issues leading to the conclusion that the data is linear to carry out linear regression. Using the result from both the Bayesian and frequentist approach we got evidence that WithMMR (or any vaccination) and PctBeliefExempt are good predictors for PctUpToDate and we get a good R2 to represents the proportion of about 69% variation in PctUpToDate for model without the PctFreeMeal column and 83% for model with PctMealFree column.
+We could see that we get similar results from the bayesian test for the model without the PctFreeMeal and we could't run the model with PctFreeMeal column included as that has null values(which is why it was dropped originally in the data cleaning step). Overall, using both frequentist and bayesian method we reached the same conclusion that MMR and PctBeliefExemption are good predictors for PctUpToDate column. 
+
+
+
+### d. _In predicting the percentage of all enrolled students with completely up-to-date vaccines, is there an interaction between PctChildPoverty and Enrolled? If so, interpret the interaction term._
+
+```{r}
+districts_log_interaction <- districts_log
+```
+
+Centering the variables before beginning with the prediction
+```{r}
+
+districts_log_interaction$PctUpToDate <- scale(districts_log_interaction$PctUpToDate,
+                                               center=T, scale=F)
+districts_log_interaction$PctChildPoverty <- scale(districts_log_interaction$PctChildPoverty,
+                                               center=T, scale=F)
+
+districts_log_interaction$Enrolled <- scale(districts_log_interaction$Enrolled,
+                                               center=T, scale=F)
+```
+
+
+Conducting linear regression on the centered data:
+
+```{r}
+lm_interaction <- lm(PctUpToDate ~ PctChildPoverty * Enrolled, 
+                   data=districts_log_interaction)
+```
+
+
+Lets check multicolinarity in the model:
+
+```{r}
+vif(lm_interaction)
+```
+
+Since the VIF for these columns is below 5 we can conclude the the output of VIF looks good and that there we dont see any hint of multicolinarity and go ahead and check the residual plots.
+
+Checking the residual plots
+
+```{r}
+plot(lm_interaction, which=2:5)
+```
+We can see at the Cook's distance graph that observation number 833 only has 0.05 influence on the regression line, 71 has 0.05 and 59 has around 0.06.
+Looking at the Residuals vs Leverage graph we can see that nothing is in the Cook's distance but there is one outlier that is influencing teh regression line but its not alot which is good. The q-q plot tells us how normally distributed the residuals are which is a basic assumption of the linear regression. Looking at the graph we can see that at the start we have more variability but the model stabilizes as the graph progresses and that the model can account for variability, overall the model is good.
+
+Now checking our model summary
+```{r}
+summary(lm_interaction)
+```
+
+We can see that the median of 1.598 is close to 0. We can also see that the f-statistic is F(3,696)
+= 29.78, the r-squared and adjusted r squared is 0.113 and 0.109 respectively which isn’t a huge value but the p-value is significant for the whole model.
+We will first examine the interaction term because the interpretation of the interaction may supersede the interpretation of the main effects. So F(3,696)=29.78 is not statistically significant at alpha level of 0.05.Hence there is no statistically significant interaction as we can see that the p value is 0.242 > 0.05. Hence we fail to reject the null hypothesis which is that there is no significant interaction effect of independent variables PctChildPoverty and Enrolled on dependent variable PctUpToDate. The main effects of PctChildPoverty and Enrolled have values of
+[PctChildPoverty]:(b = 0.25296, t(696)=5.696, p<.001) and [Enrolled]: (b = 2.55866, t(696)=7.622, p<.001). Since they are statistically significant at alpha level of 0.05, we reject the null hypothesis which is that there is no significant main effect of independent variables PctChildPoverty and Enrolled on dependent variable PctFreeMeal. In statistics, an omnibus test is any statistical test that tests for the significance of several parameters in a model at once. The omnibus statistics here tells us that the main effects are statistically significant as their p-value is lower than the 0.05 threshold, but the interaction effect is not significant as the p-value of 0.242 >> 0.05.
+
+
+To see which predictors have the biggest impact on the result, we will compare standardized coefficients, i.e., those based on standardized variables:
+
+```{r}
+summary(lm.beta(lm_interaction))
+```
+
+
+The significant variables are the percentage of children in district living below the poverty line
+and percentage of all enrolled students.
+It means the if a student is living in district living below poverty line is more up to date with their vaccination,  more enrolled students are more up to date vaccination. We can see that the interaction term is not significant.
+
+Doing the Bayesian Test for the same:
+
+```{r}
+interaction_lmBF <- lmBF(PctUpToDate ~ PctChildPoverty * Enrolled, 
+                   data=districts_log_interaction,
+                  posterior=TRUE, iterations=10000, rnd.seed=772)
+summary(interaction_lmBF)
+```
+
+In the output displayed above, we have parameter estimates for the B-weights of each of our predictions (the column labeled “Mean”).
+In the second section, we have the 2.5% and 97.5% boundaries of the HDI for each of the B-weights.These boundaries mark the edges of the central region of the posterior distribution for each B-weight. So PctChildPoverty predictor has a lower bound of 0.16  to upper bound at 0.33, and Enrolled has HDI of 1.85 to 3.15; since the HDI does not contain 0 we have credible evidence that there is a difference in between the variables.
+The HDI for the interaction term is -0.09 to 0.02 and since it spans 0 the observed differences could be due to chance.
+
+Also we can see that the means from our bayesian test match the estimates we got from the frequentist model.
+
+```{r}
+# running the same model without the iterations to get bayes factor value
+interaction_lmBF_out <- lmBF(PctUpToDate ~ PctChildPoverty * Enrolled, 
+                   data=districts_log_interaction,
+                   rnd.seed=772)
+interaction_lmBF_out
+
+```
+
+We get a very high bayes factor of 1.016188e+15 showing there are very strong odds in the favor of the alternative hypothesis and we can reject the null hypothesis which suggests that interpect only model is better.
+In conclusion, a linear regression was performed to estimate the percentage of all enrolled students with up to date vaccination with use of PctChildPoverty, and Enrolled as the predictors. In the data cleaning process to remove skewness we took log transformation on Enrolled and Total schools columns. In the bivariate analysis we saw that the remaining or little skewness didn't cause any major issues and that the data was linear to carry out linear regression. Using the result from both the Bayesian and frequentist approach we got evidence that PctFamilyPoverty , Enrolled are good predictors for PctUpToDate but the interaction term isn't a good predictor.
+
+
+
+### e. _Which, if any, of the four predictor variables predict whether or not a district’s reporting was complete?_
+
+```{r}
+# creating a new df of the cleaned data for better readability
+# also converting logical DistrictComplete to factor
+districts_log_districtComplete <- subset(districts_log, select = c(PctChildPoverty, 
+                                                         PctFamilyPoverty,
+                                                         Enrolled, 
+                                                         TotalSchools,
+                                                         DistrictComplete))
+districts_log_districtComplete$DistrictComplete <- as.integer(districts_log_districtComplete$DistrictComplet)
+str(districts_log_districtComplete)
+```
+
+
+```{r}
+districts_log_districtComplete %>% pivot_longer(cols=-c(DistrictComplete), 
+                                                names_to="variable",
+                                                values_to="value", 
+                                                values_drop_na = TRUE) %>%
+  ggplot(aes(x=variable, y=value)) + 
+  geom_violin(bw=.5) + 
+  facet_wrap( ~ variable, scales="free")
+```
+We can high variability in PctChildPoverty and PctFamilyPoverty and low variability in TotalSchools and Enrolled.
+
+```{r}
+pairs.panels(districts_log_districtComplete)
+```
+We can see that PctChildPoverty, PctFamilyPoverty are right skewed, Enrolled are almost normal and TotalSchools is slightly skewed (but alot better than before doing the log transformation).
+We can also see that there is high correlation between Percentage of children in district living below the poverty line and Percentage of families in district living below the poverty line which makes sense as they can be inter related i.e they must be children of the families staying in districts below the poverty line. 
+There is also high correlation between totalschools and enrolled students which makes sense as there is interloping of the districts with a child being enrolled and in the district of the school.
+Rest of the correlations are low which is great for linear modelling.
+
+```{r}
+districtsComplete_glm <- glm(formula = DistrictComplete ~ ., 
+                             family = binomial(link="logit"),
+                             data = districts_log_districtComplete)
+```
+
+Checking heteroskadacity 
+
+```{r}
+vif(districtsComplete_glm)
+```
+
+
+Checking the model performance
+
+```{r}
+simulationOutput <- simulateResiduals(fittedModel = districtsComplete_glm, n = 250)
+
+plot(simulationOutput)
+```
+Looking at the qq plot are normally distributed and no deviations are visible
+and the residual vs predicted plot des show a deviation at 0.75.
+
+Since we got a high vif and devaition in the dharma plot let's check create another model and check if we can get better values
+
+```{r}
+vif(glm(formula = DistrictComplete ~ . -TotalSchools, 
+                             family = binomial(link="logit"),
+                             data = districts_log_districtComplete))
+vif(glm(formula = DistrictComplete ~ . -Enrolled, 
+                             family = binomial(link="logit"),
+                             data = districts_log_districtComplete))
+
+# Since Removing ENrolled gives a better vif result and reduces 
+# multi collinarity more 
+districtsComplete_glm2 <- glm(formula = DistrictComplete ~ . -Enrolled, 
+                             family = binomial(link="logit"),
+                             data = districts_log_districtComplete)
+
+```
+
+```{r}
+simulationOutput <- simulateResiduals(fittedModel = districtsComplete_glm,
+                             n=250)
+plot(simulationOutput)
+simulationOutput2 <- simulateResiduals(fittedModel = districtsComplete_glm2,
+                             n=250)
+plot(simulationOutput2)
+```
+For the first model we see that qq plot are normally ditributed but the residual vs predicted plot see one deviation.
+Looking at the qq plot and residual vs predicted plot we can see that the values are normally distributed and no deviations are visible so we can go ahead and look at the summary of the model.
+
+Checking the model accuracy 
+```{r}
+model_performance(districtsComplete_glm)
+model_performance(districtsComplete_glm2)
+
+```
+
+Since we get Tjur's R2 is having 0.171 for model 1 and 0.077 for model 2, since model 1 has a better R2 we will use that model for analysis.
+
+
+```{r}
+summary(districtsComplete_glm)
+```
+
+Here we see that TotalSchools is an excellent predictors for whether or not district’s reporting was complete. The median value that we see is 0.2575 which is close to zero. Here there is a z-value which is Wald’s Z test and is conceptually similar to a t-test. We can see that TotalSchools reports - (b= 1.87705, t(695)=5.341,p<.001) and Enrolled reports - (b= -3.24, t(695)=-6.194,p<.001) which shows that we can reject the null hypothesis that the coefficient on totalschools are 0 in the population. The variable PctChildPoverty reports (b=0.01754, t(695)=0.559, p>0.05) and PctFamilyPoverty reports (b=-0.08229, t(695)=-1.876, p>0.05) and for these two predictors we fail to reject the null.
+The bottom part of the output contains the omnibus test. There is a section Null Deviance, which is a model representing the null hypothesis. Then there is residual deviance, which represents what the model is like with predictors in it. The difference between the null deviance and the residual deviance model is the omnibus test and that is distributed as chi-squared. Since there is no chi-squared in the output we can do it manually and see that
+the value would be 323.23 - 249.94 = 73.29. AIC stands for Akaike information criterion and is the measure of stress on the model and we get a value of 259.94 but this is not important to use now as AIC is used to compare models and since we are only looking at one model here there is nothing to compare to.
+
+Converting log odds to odds and the Confidence interval
+
+```{r}
+exp(coef(districtsComplete_glm))
+exp(confint(districtsComplete_glm)) 
+```
+
+
+Looking at the above 2 outputs , we an interpret that one unit change in PctChildPoverty leads to 1.01769642 chance of whether or not district’s reporting was complete ; every unit increase in PctFamilyPoverty leads to 0.92100599  chance ; every unit log increase in TotalSchools leads to 0.03905349 increase in chance of whether or not district’s reporting was complete and every unit log increase in Enrolled leads to 6.53417961 increase in chance of whether or not district’s reporting was complete. Looking at the CI we can see that we have a lower bound of 0.95890342 to upper bound of 1.0843360 for PctChildPoverty, PctFamilyPoverty has 0.8437891 to 1.0025368 , TotalSchools has 0.01309476 to 0.1030349 and Enrolled has 3.36761705 to 13.4719170. Since none of the CI don’t coincide with 0 it means that it’s unlikely that the true value is 0
+
+Doing the Bayesian version of the test:
+
+```{r}
+districtsComplete_glm.bayes <- MCMClogit(formula = DistrictComplete ~.,
+                                         data=districts_log_districtComplete,
+                                         rnd.seed=772)
+summary(districtsComplete_glm.bayes)
+```
+We can see that the point estimates for the intercept and the coefficients are quite similar to the output from the traditional logistic regression. Next we can see SD column which corresponds to the standard error in the output from the traditional logistic regression (because in this analysis it is a standard deviation of a sampling distribution). The second part of the output displays quantiles for each coefficient, including the 2.5% and 97.5% quantiles. The region in between the 2.5% and the 97.5% quantiles for each coefficient is the highest density interval (HDI) for the given coefficient. We can see PctChildPoverty predictor has a lower bound of -4.26948 to upper bound of 0.460003 and it coincides with 0 so it is possible that the observed difference is due to chance. Comparing it with out frequentist model we can see that we reach the same conclusion that PctChildPoverty predictor is not significant. Looking at the -0.16976 predictor we have a lower bound of -0.16976 to upper bound of -0.001577, ENrolled has 1.23055 to 2.587017 and TotalSchools has -4.37810 to -2.320364. Since the HDI doesn’t coincide with 0 for these 3 columns we have credible evidence that there is a difference in between the variables. Except for PctFamilyPoverty we can see that the results match with our frequentist model.
+
+```{r}
+plot(districtsComplete_glm.bayes)
+```
+Looking at the density plots for all the columns we don’t see any distinctive patterns and the density plot looks pretty smooth.
+
+In conclusion, using the result from both the Bayesian and frequentist approach we got evidence that totalSchools and Enrolled are good predictors for DistrictComplete.
+
+## 7.	_Concluding Paragraph_
+
+_Describe your conclusions, based on all of the foregoing analyses. As well, the staff member in the state legislator’s office is interested to know how to allocate financial assistance to school districts to improve both their vaccination rates and their reporting compliance. Make sure you have at least one sentence that makes a recommendation about improving vaccination rates. Make sure you have at least one sentence that makes a recommendation about improving reporting rates. Finally, say what further analyses might be helpful to answer these questions and any additional data you would like to have. _
+
+We were analyzing vaccination rates to see how different factors like poverty, religion, medical factors affect vaccinations and analyze the vaccination rates. Considering all the models we built so far, be it frequentist or Bayesian we saw that our results from both were matching reinforcing our confidence in our results and helping us with our recommendations which we will give over.
+First we saw that if a student took one vaccine, there is a high chance that they took all the other vaccines like Polio, MMR, DTP, HepB. We also saw that having rules mandated in states affects the vaccination rate in a positive way and that belonging to a district which is below poverty line, there is a boost in vaccination probably. We can see that in the recent years the vaccination rate was pretty much constant.
+
+We got the below observations from our analysis/conclusion:
+1. public schools were the major ones that reported their vaccination data and since they are funded by the state, the state legislator's office should allocate financial assistance to school
+districts as they will not only help eradicate or avoid an epidemic but also help students which come from low economic backgrounds to get the necessary vaccinations.
+2. Since the state would be funding these schools they can even get compliance on reporting of vaccination records from atleast the public schools.
+3. Families in the below poverty district affected negatively meaning , the income didn't affect their will to get their children vaccinated which could be because they go in state funded schools so they don't have to pay for the vaccination.
+4. Families who enrolled their children in school didn't want to take the belief exempt as maybe since the parents are educated they know that vaccination is important.
+5. Families below poverty line preferred to get the vaccination and same is the case with enrolled students where we saw that such children had their vaccination up to date.
+6. We could see that the interaction between PctChildPoverty and Enrolled was not significant.
+
+Recommendations and Further Analysis:
+1. The state should make reporting vaccination data a rule so that even private schools report their data
+2. We saw that mandating vaccination in California really helped in increasing the vaccination rate, so mandating vaccination for children in every public and private school would be really beneficial.But we can't be sure until we analyze the state wise data for the whole of the United States and compare the vaccination rate between states where vaccination is not mandated and where it is like in California.
+3. It would be good to know if state schools pay for the vaccination or not as the whole assumption here along with the conclusion of the model are that the state is paying for public school vaccinations.
+4. Parents in private schools must have to fill in their childrens vaccination as a compulsary task for admission.
