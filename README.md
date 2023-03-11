@@ -3,12 +3,12 @@
 ### Problem Statement
 
 I tried to analyze vaccination rates in California schools and school districts using various statistical tools
-using Time series data from the World Health Organization reporting vaccination rates in the U.S. for five
-common vaccines and California public school districts from 2017 data collection along with data from about
+on Time series data from the World Health Organization which reported the vaccination rates in the U.S. for five
+common vaccines and California public school districts from 2017 along with data from about
 7,381 individual schools. Given the world’s recent exposure to COVID-19, we know now more than ever how
 vaccinations can curb the spread of virus and saves lives, and in this project I analyzed and saw how
 different factors like poverty, religion, medical factors affect vaccinations.
-The whole analysis was conduted using R programming using R-studio.
+The whole analysis was conducted using R programming using R-studio.
 
 
 ### Analysis
