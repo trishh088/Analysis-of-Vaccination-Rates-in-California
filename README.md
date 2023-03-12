@@ -13,12 +13,12 @@ The whole analysis was conducted using R programming using R-studio.
 
 ### Analysis
 
-The following steps were followed to generate the report which can be found in the [PDF](https://github.com/trishh088/Analysis-of-Vaccination-Rates-in-California/blob/main/Fall%202021%20IST%20772%20-%20Final%20Examination.pdf)
+The following steps were followed to generate the report which can be found in the [PDF](https://github.com/trishh088/Analysis-of-Vaccination-Rates-in-California/blob/main/Final%20Report.pdf)
 
-1) I did Explatory Data Analysis to understand the data provided and check if there are any outliers, Null, skewness, normality, correlation that can affect our analysis for both the delimited data frame and the time series data frame.
-2) I removed outliers, skewness to make sure that the data is normal and check if there is no correlation for the delimited data frame and removed trend and cyclicity in the time series data frame.
+1) I did Exploratory Data Analysis to understand the data provided and check if there are any outliers, nulls, skewness, normality or correlation that can affect the analysis for both the delimited data frame and the time series data frame.
+2) I removed outliers, skewness to make sure that the data is normal and checked correlation for the delimited data frame and removed trend and cyclicity in the time series data frame.
 3) Tried to answer multiple questions such as - mean U.S. vaccination rates from recent years, among districts, how are the vaccination rates for individual
-vaccines related?, how do these Californian vaccination levels compare to U.S. vaccination levels etc. using frequentist and bayesian tests.
+vaccines related?, how do these Californian vaccination levels compare to U.S. vaccination levels etc. using frequentist and Bayesian tests.
 
 ### Conclusion
 Considering all the models I built, be it frequentist or Bayesian, I saw that the results from both were matching, reinforcing confidence in the results. 
